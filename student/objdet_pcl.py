@@ -174,8 +174,9 @@ def bev_from_pcl(lidar_pcl, configs, vis):
     
     
     ## step 5 : temporarily visualize the intensity map using OpenCV to make sure that vehicles separate well from the background
-#     cv2.imshow('img_intensity', intensity_map)
-#     cv2.waitKey(0)
+    if vis == True:
+        cv2.imshow('img_intensity', intensity_map)
+        cv2.waitKey(0)
     #######
     ####### ID_S2_EX2 END ####### 
 
@@ -195,8 +196,9 @@ def bev_from_pcl(lidar_pcl, configs, vis):
     height_map = height_map/np.abs(configs.lim_z[1] - configs.lim_z[0])
     
     ## step 3 : temporarily visualize the intensity map using OpenCV to make sure that vehicles separate well from the background
-#     cv2.imshow('height_intensity', height_map)
-#     cv2.waitKey(0)
+    if vis == True:
+        cv2.imshow('height_intensity', height_map)
+        cv2.waitKey(0)
     #######
     ####### ID_S2_EX3 END #######       
 
