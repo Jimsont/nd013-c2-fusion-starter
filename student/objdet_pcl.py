@@ -111,7 +111,7 @@ def show_range_image(frame, lidar_name):
 
 
 # create birds-eye view of lidar data
-def bev_from_pcl(lidar_pcl, configs, vis):
+def bev_from_pcl(lidar_pcl, configs, vis = True):
 
     # remove lidar points outside detection area and with too low reflectivity
     mask = np.where((lidar_pcl[:, 0] >= configs.lim_x[0]) & (lidar_pcl[:, 0] <= configs.lim_x[1]) &
