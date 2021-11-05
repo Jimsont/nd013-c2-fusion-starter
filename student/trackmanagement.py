@@ -35,20 +35,44 @@ class Track:
         # - initialize track state and track score with appropriate values
         ############
 
-        self.x = np.matrix([[49.53980697],
-                        [ 3.41006279],
-                        [ 0.91790581],
-                        [ 0.        ],
-                        [ 0.        ],
-                        [ 0.        ]])
+#         self.x = np.matrix([[49.53980697],
+#                         [ 3.41006279],
+#                         [ 0.91790581],
+#                         [ 0.        ],
+#                         [ 0.        ],
+#                         [ 0.        ]])
+        # initialize x prior
+        x = np.zeros((6,1))
+        
+        # transfer sensor measurement to veh measurement
+        x_sen = np.ones((4,1))
+        x_sen[0:meas.sensor.dim_meas] = meas.z
+#         x_sen[-1] = 1
+        x_sen = np.matrix(x_sen)
+        x_veh = meas.sensor.sens_to_veh*x_sen
+        
+        # update x prior
+        x[0:meas.sensor.dim_meas] = x_veh[0:meas.sensor.dim_meas]
+        
+        # set self.x
+        self.x = np.matrix(x)
+
+        # initialize covariance prior
         self.P = np.matrix([[9.0e-02, 0.0e+00, 0.0e+00, 0.0e+00, 0.0e+00, 0.0e+00],
-                        [0.0e+00, 9.0e-02, 0.0e+00, 0.0e+00, 0.0e+00, 0.0e+00],
-                        [0.0e+00, 0.0e+00, 6.4e-03, 0.0e+00, 0.0e+00, 0.0e+00],
-                        [0.0e+00, 0.0e+00, 0.0e+00, 2.5e+03, 0.0e+00, 0.0e+00],
-                        [0.0e+00, 0.0e+00, 0.0e+00, 0.0e+00, 2.5e+03, 0.0e+00],
-                        [0.0e+00, 0.0e+00, 0.0e+00, 0.0e+00, 0.0e+00, 2.5e+01]])
-        self.state = 'confirmed'
-        self.score = 0
+                            [0.0e+00, 9.0e-02, 0.0e+00, 0.0e+00, 0.0e+00, 0.0e+00],
+                            [0.0e+00, 0.0e+00, 6.4e-03, 0.0e+00, 0.0e+00, 0.0e+00],
+                            [0.0e+00, 0.0e+00, 0.0e+00, 2.5e+03, 0.0e+00, 0.0e+00],
+                            [0.0e+00, 0.0e+00, 0.0e+00, 0.0e+00, 2.5e+03, 0.0e+00],
+                            [0.0e+00, 0.0e+00, 0.0e+00, 0.0e+00, 0.0e+00, 2.5e+01]])
+        self.P[3,3] = params.sigma_p44
+        self.P[4,4] = params.sigma_p55
+        self.P[5,5] = params.sigma_p66
+        
+        # set track state (state could be 'initialized', 'confirmed', ' tentative')
+        self.state = 'initialized'
+        
+        # set track score
+        self.score = 1./params.window
         
         ############
         # END student code
@@ -101,15 +125,44 @@ class Trackmanagement:
         ############
         
         # decrease score for unassigned tracks
+#         print("unassigned_tracks length = ", len(unassigned_tracks))
         for i in unassigned_tracks:
             track = self.track_list[i]
             # check visibility    
+#             print("meas_list length = ", len(meas_list))
             if meas_list: # if not empty
                 if meas_list[0].sensor.in_fov(track.x):
                     # your code goes here
-                    pass 
-
+                    # each time if a track is still in FOV but no measurement assigned to it, 
+                    # reduce track score by 1./params.window
+#                     print("decrease track score")
+                    if track.score - 1./params.window >=0 :
+                        track.score = track.score - 1./params.window
+                    
+                    # assign updated track back to the list
+                    self.track_list[i] = track
+                    
         # delete old tracks   
+        # initiate indicy count
+        # when count is smaller than length of self.track_list, keep checking 
+        # if next track needs to be removed until all tracks have been checked
+        count = 0
+#         print("track_list length =", len(self.track_list))
+        while count<len(self.track_list):
+            track = self.track_list[count]
+            
+            if track.state == 'confirmed':
+                if track.score < params.delete_threshold or track.P[0,0] > params.max_P or track.P[1,1] > params.max_P:
+                    print("delete track drops out id = ", track.id)
+                    self.delete_track(track)
+                else:
+                    count = count + 1
+            else:
+                if (track.P[0,0] > params.max_P) or (track.P[1,1] > params.max_P):
+                    print("delete ghost track id = ", track.id)
+                    self.delete_track(track)
+                else:
+                    count = count + 1
 
         ############
         # END student code
@@ -139,8 +192,14 @@ class Trackmanagement:
         # - increase track score
         # - set track state to 'tentative' or 'confirmed'
         ############
-
-        pass
+        if track.score + 1./params.window < 1:
+#             print("increase track score")
+            track.score = track.score + 1./params.window
+        if (track.state == 'initialized') and (track.score > params.delete_threshold):
+            track.state = 'tentative'
+        if (track.state == 'tentative') and (track.score > params.confirmed_threshold):
+            track.state = 'confirmed'
+        
         
         ############
         # END student code

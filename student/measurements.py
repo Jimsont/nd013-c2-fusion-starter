@@ -47,8 +47,30 @@ class Sensor:
         # TODO Step 4: implement a function that returns True if x lies in the sensor's field of view, 
         # otherwise False.
         ############
+        
+        
+        ## check if an object x can be seen by this sensor
+        # transfer position measurement to homogeneous coordinates.  [x, y, z] to [x, y, z, 1]
+        # transfer homogeneous coordinates from vehicle coordinate to sensor coordinate
+        # set visibility to False
+        # check if the object is in the sensor FOV
+        
+        # create homogeneous coordinates
+        pos_veh = np.ones((4, 1)) 
+        pos_veh[0:3] = x[0:3] 
+        
+        # transform from vehicle to sensor coordinates
+        pos_sens = self.veh_to_sens*pos_veh 
+        visible = False
+        
+        # make sure to not divide by zero - we can exclude the whole negative x-range here
+        if pos_sens[0] > 0: 
+            alpha = np.arctan(pos_sens[1]/pos_sens[0]) # calc angle between object and x-axis
+            # no normalization needed because returned alpha always lies between [-pi/2, pi/2]
+            if alpha > self.fov[0] and alpha < self.fov[1]:
+                visible = True
 
-        return True
+        return visible
         
         ############
         # END student code
@@ -71,7 +93,26 @@ class Sensor:
             # - return h(x)
             ############
 
-            pass
+            pos_veh = np.ones((4, 1)) # homogeneous coordinates 
+            pos_veh[0:3] = x[0:3]
+            
+            # transform position estimate from vehicle to camera coordinates
+            pos_sens = self.veh_to_sens*pos_veh
+            x_sens = pos_sens[0]
+            y_sens = pos_sens[1]
+            z_sens = pos_sens[2]
+            
+            # project from camera to image coordinates
+            pos_image = np.zeros((2,1))
+            
+            # if x = 0, return raise error
+            # else, calculate h(x)
+            if x_sens == 0:
+                raise NameError("divided by zero")
+            else:
+                pos_image[0] = self.c_i - self.f_i * y_sens / x_sens
+                pos_image[1] = self.c_j - self.f_j * z_sens / x_sens
+                return pos_image
         
             ############
             # END student code
@@ -110,16 +151,22 @@ class Sensor:
         return H   
         
     def generate_measurement(self, num_frame, z, meas_list):
+        
         # generate new measurement from this sensor and add to measurement list
         ############
         # TODO Step 4: remove restriction to lidar in order to include camera as well
         ############
         
+        # code for only return lidar sensor measurement
+        '''
         if self.name == 'lidar':
             meas = Measurement(num_frame, z, self)
             meas_list.append(meas)
         return meas_list
-        
+        '''
+        meas = Measurement(num_frame, z, self)
+        meas_list.append(meas)
+        return meas_list
         ############
         # END student code
         ############ 
@@ -132,8 +179,6 @@ class Measurement:
     def __init__(self, num_frame, z, sensor):
         # create measurement object
         self.t = (num_frame - 1) * params.dt # time
-        self.sensor = sensor # sensor that generated this measurement
-        
         if sensor.name == 'lidar':
             sigma_lidar_x = params.sigma_lidar_x # load params
             sigma_lidar_y = params.sigma_lidar_y
@@ -142,6 +187,7 @@ class Measurement:
             self.z[0] = z[0]
             self.z[1] = z[1]
             self.z[2] = z[2]
+            self.sensor = sensor # sensor that generated this measurement
             self.R = np.matrix([[sigma_lidar_x**2, 0, 0], # measurement noise covariance matrix
                                 [0, sigma_lidar_y**2, 0], 
                                 [0, 0, sigma_lidar_z**2]])
@@ -153,10 +199,27 @@ class Measurement:
         elif sensor.name == 'camera':
             
             ############
-            # TODO Step 4: initialize camera measurement including z and R 
+            # TODO Step 4: initialize camera measurement including z, R, and sensor 
             ############
-
-            pass
+            
+            # load sigma parameters
+            sigma_cam_i = params.sigma_cam_i  # load params
+            sigma_cam_j  = params.sigma_cam_j 
+            
+            # create measurement vector
+            self.z = np.zeros((sensor.dim_meas,1))
+            self.z[0] = z[0]
+            self.z[1] = z[1]
+            
+            # create sensor object that generated this measurement
+            self.sensor = sensor
+            
+            # create noise covariance matrix
+            R = np.zeros((2,2))
+            R[0, 0] = sigma_cam_i**2
+            R[1, 1] = sigma_cam_j**2
+            self.R = np.matrix(R)
+            
         
             ############
             # END student code
